@@ -1,20 +1,12 @@
-#"""
-#app.py - Aplikasi Web untuk Deteksi Uang Rupiah
-#===============================================
-#Web application menggunakan Flask sebagai framework backend.
-#
-#Fitur:
-#1. Upload gambar dan deteksi nominal uang
-#2. Preview gambar yang diupload
-#3. Deteksi real-time menggunakan kamera
-#4. Panduan suara untuk tunanetra
-#5. UI yang aksesibel (tombol besar, kontras tinggi)
-#
-#Cara menjalankan:
-#    python app.py
-#
-#Kemudian buka browser: http://localhost:5000
-#"""
+"""
+Fitur:
+1. Upload gambar dan deteksi nominal uang
+2. Preview gambar yang diupload
+3. Deteksi real-time menggunakan kamera
+4. Panduan suara untuk tunanetra
+5. UI yang aksesibel (tombol besar, kontras tinggi)
+
+"""
 
 import os
 import sys
@@ -24,6 +16,8 @@ import logging
 import threading
 from io import BytesIO
 from datetime import datetime
+from flask import Flask, request, jsonify
+from flask_cors import CORS 
 
 import numpy as np
 from PIL import Image
@@ -43,10 +37,9 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-# ============================================================
 # KONFIGURASI FLASK APP
-# ============================================================
 app = Flask(__name__)
+CORS(app)
 
 # Konfigurasi upload
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # Maks 16MB
@@ -72,14 +65,12 @@ audio_state = {
     'last_status': None,
     'last_nominal': None,
     'last_update': 0,
-    'cooldown_seconds': 3  # Cooldown 3 detik
+    'cooldown_seconds': 6  # Cooldown 3 detik
 }
 
 
-# ============================================================
 # LOAD MODEL (SINGLETON PATTERN)
 # Model dimuat sekali saat aplikasi pertama dijalankan
-# ============================================================
 predictor = None
 model_loaded = False
 model_error = None
@@ -95,20 +86,20 @@ def load_predictor():
         from predict import RupiahPredictor
         
         model_path = os.path.join(
-            os.path.dirname(__file__), '..', 'model', 'rupiah_model.h5'
+            os.path.dirname(__file__), '..', 'modell', 'rupiah_model.h5'
         )
         labels_path = os.path.join(
-            os.path.dirname(__file__), '..', 'model', 'class_labels.json'
+            os.path.dirname(__file__), '..', 'modell', 'class_labels.json'
         )
         
         logger.info("Memuat model...")
         predictor = RupiahPredictor(model_path=model_path, labels_path=labels_path)
         model_loaded = True
-        logger.info("✅ Model berhasil dimuat!")
+        logger.info("Model berhasil dimuat!")
         
     except Exception as e:
         model_error = str(e)
-        logger.error(f"❌ Gagal memuat model: {e}")
+        logger.error(f"Gagal memuat model: {e}")
     
     return predictor
 
@@ -121,27 +112,24 @@ def preload_model():
 threading.Thread(target=preload_model, daemon=True).start()
 
 
-# ============================================================
 # HELPER FUNCTIONS
-# ============================================================
-
 def allowed_file(filename):
-    """Cek apakah ekstensi file diperbolehkan"""
+    #Cek apakah ekstensi file diperbolehkan
     return '.' in filename and \
            filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
 
 def preprocess_base64_image(base64_string):
-    """
-    Konversi gambar base64 menjadi PIL Image.
-    Digunakan untuk memproses frame dari kamera (dikirim sebagai base64).
     
-    Args:
-        base64_string: String base64 gambar
+    #Konversi gambar base64 menjadi PIL Image.
+    #Digunakan untuk memproses frame dari kamera (dikirim sebagai base64).
     
-    Returns:
-        PIL.Image object
-    """
+    #Args:
+     #   base64_string: String base64 gambar
+    
+    #Returns:
+    #    PIL.Image object
+    
     # Hapus header data URL jika ada (misal: "data:image/jpeg;base64,...")
     if ',' in base64_string:
         base64_string = base64_string.split(',')[1]
@@ -152,9 +140,8 @@ def preprocess_base64_image(base64_string):
 
 
 def detect_money_position(img_array):
-    """
-    Deteksi posisi/ukuran uang dalam frame menggunakan OpenCV.
-    
+    #Deteksi posisi/ukuran uang dalam frame menggunakan OpenCV.
+    """"
     Memberikan panduan:
     - Terlalu jauh: bounding box kecil
     - Terlalu dekat: bounding box besar
@@ -218,14 +205,14 @@ def detect_money_position(img_array):
         area_ratio = contour_area / frame_area
         
         # Tentukan status berdasarkan rasio area
-        if area_ratio < 0.08:
+        if area_ratio < 0.04:
             return {
                 'status': 'too_far',
                 'message': 'Uang terlalu jauh, mohon dekatkan',
                 'guidance': 'closer',
                 'bbox_ratio': area_ratio
             }
-        elif area_ratio > 0.65:
+        elif area_ratio > 0.85:
             return {
                 'status': 'too_close', 
                 'message': 'Uang terlalu dekat, mohon dijauhkan sedikit',
@@ -296,114 +283,33 @@ def should_give_audio_feedback(new_status, new_nominal=None):
     return False
 
 
-# ============================================================
 # ROUTE: HALAMAN UTAMA
-# ============================================================
-
 @app.route('/')
 def index():
     """Halaman utama aplikasi"""
     return render_template('index.html')
 
 
-# ============================================================
-# ROUTE: UPLOAD DAN DETEKSI GAMBAR
-# ============================================================
-
-@app.route('/detect', methods=['POST'])
-def detect():
-    """
-    Endpoint untuk mendeteksi nominal uang dari gambar yang diupload.
-    
-    Menerima:
-        - File gambar (multipart/form-data)
-        - atau Base64 string (application/json)
-    
-    Mengembalikan:
-        JSON dengan hasil deteksi
-    """
-    pred = load_predictor()
-    
-    if pred is None:
-        error_msg = model_error or "Model belum tersedia"
-        if "tidak ditemukan" in error_msg.lower():
-            error_msg = (
-                "Model belum tersedia. "
-                "Silakan jalankan notebook training terlebih dahulu!"
-            )
-        return jsonify({'error': error_msg, 'success': False}), 503
-    
-    try:
-        img = None
-        
-        # Cek apakah request berisi file upload
-        if 'file' in request.files:
-            file = request.files['file']
-            
-            if file.filename == '':
-                return jsonify({'error': 'Tidak ada file yang dipilih', 'success': False}), 400
-            
-            if not allowed_file(file.filename):
-                return jsonify({
-                    'error': f'Format file tidak didukung. Gunakan: {", ".join(ALLOWED_EXTENSIONS)}',
-                    'success': False
-                }), 400
-            
-            img = Image.open(file.stream).convert('RGB')
-        
-        # Cek apakah request berisi base64 image
-        elif request.is_json and 'image' in request.json:
-            img = preprocess_base64_image(request.json['image'])
-        
-        else:
-            return jsonify({
-                'error': 'Tidak ada gambar yang diterima',
-                'success': False
-            }), 400
-        
-        # Lakukan prediksi
-        result = pred.predict(img)
-        
-        # Tambah informasi tambahan
-        result['success'] = True
-        result['timestamp'] = datetime.now().isoformat()
-        
-        logger.info(
-            f"Prediksi: {result['label']} "
-            f"(confidence: {result['confidence_pct']:.1f}%)"
-        )
-        
-        return jsonify(result)
-    
-    except Exception as e:
-        logger.error(f"Error saat prediksi: {e}")
-        return jsonify({
-            'error': f'Terjadi kesalahan: {str(e)}',
-            'success': False
-        }), 500
-
-
-# ============================================================
 # ROUTE: DETEKSI REAL-TIME (FRAME KAMERA)
-# ============================================================
-
+# Satu-satunya mode deteksi — tidak ada upload gambar manual
+# Semua deteksi dilakukan otomatis via kamera
 @app.route('/detect-realtime', methods=['POST'])
 def detect_realtime():
-    """
-    Endpoint untuk deteksi real-time dari frame kamera.
     
-    Alur:
-    1. Terima frame kamera (base64)
-    2. Deteksi posisi/ukuran uang dalam frame
-    3. Jika posisi ideal, lakukan klasifikasi nominal
-    4. Kembalikan hasil + panduan audio
+    #Endpoint untuk deteksi real-time dari frame kamera.
     
-    Menerima:
-        JSON: {'image': '<base64 string>'}
+    #Alur:
+    #1. Terima frame kamera (base64)
+    #2. Deteksi posisi/ukuran uang dalam frame
+    #3. Jika posisi ideal, lakukan klasifikasi nominal
+    #4. Kembalikan hasil + panduan audio
     
-    Mengembalikan:
-        JSON dengan status, panduan, dan hasil deteksi
-    """
+    #Menerima:
+    #    JSON: {'image': '<base64 string>'}
+    
+    #Mengembalikan:
+    #    JSON dengan status, panduan, dan hasil deteksi
+    
     if not request.is_json:
         return jsonify({'error': 'Request harus JSON', 'success': False}), 400
     
@@ -473,13 +379,10 @@ def detect_realtime():
         }), 500
 
 
-# ============================================================
 # ROUTE: STATUS MODEL
-# ============================================================
-
 @app.route('/model-status')
 def model_status():
-    """Cek status model apakah sudah siap atau belum"""
+    #Cek status model apakah sudah siap atau belum
     pred = load_predictor()
     
     if pred:
@@ -496,10 +399,7 @@ def model_status():
         }), 503
 
 
-# ============================================================
 # ROUTE: SERVE STATIC FILES
-# ============================================================
-
 @app.route('/static/<path:filename>')
 def serve_static(filename):
     """Serve file statis (CSS, JS, gambar)"""
@@ -509,10 +409,7 @@ def serve_static(filename):
     )
 
 
-# ============================================================
 # ERROR HANDLERS
-# ============================================================
-
 @app.errorhandler(413)
 def too_large(e):
     """Handle file terlalu besar"""
@@ -534,17 +431,14 @@ def internal_error(e):
     return jsonify({'error': 'Terjadi kesalahan server', 'success': False}), 500
 
 
-# ============================================================
 # JALANKAN APLIKASI
-# ============================================================
-
 if __name__ == '__main__':
     print('=' * 60)
-    print('🏦 DETEKSI UANG RUPIAH - APLIKASI WEB')
+    print('DETEKSI UANG RUPIAH - APLIKASI WEB')
     print('   Sistem Bantu Tunanetra')
     print('=' * 60)
-    print(f'🌐 Buka browser: http://localhost:5000')
-    print(f'📁 Upload folder: {app.config["UPLOAD_FOLDER"]}')
+    print(f'Buka browser: http://localhost:5000')
+    print(f'Upload folder: {app.config["UPLOAD_FOLDER"]}')
     print('=' * 60)
     
     # debug=False untuk production
