@@ -7,3 +7,5 @@ werkzeug
 pandas
 seaborn
 scikit-learn
+opencv-python
+flask_cors
