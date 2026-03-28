@@ -9,10 +9,11 @@ Dataset yang digunakan dalam proyek ini merupakan **gabungan hasil kurasi mandir
 Sumber Utama:[Rupiah Banknotes - Nurul Alfiyyah](https://www.kaggle.com/datasets/nurulalfiyyah/rupiah-banknotes)
 Sumber Tambahan:[Indonesian Banknotes - Brotoa](https://www.kaggle.com/datasets/brotoa/indonesian-banknotes-for-machine-learning)
 
-Catatan Penggunaan:
-Karena batasan ukuran file di GitHub (Large Files), dataset fisik tidak diunggah langsung ke repository ini. Pengguna dapat mengunduh dari sumber asli di atas. 
+*Unduh Dataset Gabungan (ZIP):*
+Karena batasan ukuran file di GitHub, dataset yang telah dikurasi dapat diunduh melalui tautan berikut:
+👉 **[Download Dataset RupiahScan via Google Drive](https://drive.google.com/drive/folders/1F7AMyKLAekq1eYbLlxawwjTTfOB4QCbg?usp=sharing)**
 
-Instruksi Setup Dataset:
+*Instruksi Setup Dataset*:
 1. Buat direktori bernama `dataset/` di root proyek.
 2. Unduh dan ekstrak kedua dataset di atas.
 3. Masukkan gambar ke dalam sub-folder sesuai label nominalnya (misal: `1000`, `2000`, dst).
