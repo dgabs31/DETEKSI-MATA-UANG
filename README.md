@@ -3,6 +3,21 @@
 **RupiahScan** adalah aplikasi berbasis Web-AI yang dirancang untuk membantu penyandang disabilitas netra mengenali nominal uang kertas Rupiah secara *real-time*[cite: 180, 187]. 
 Sistem ini bertindak sebagai "mata" digital yang mengonversi visual uang menjadi informasi suara[cite: 187].
 
+## 📊 Dataset & Preprocessing
+Dataset yang digunakan dalam proyek ini merupakan **gabungan hasil kurasi mandiri** dari dua sumber publik utama di Kaggle. Hal ini dilakukan untuk memperkaya variasi data latih (augmentation by source).
+
+Sumber Utama:[Rupiah Banknotes - Nurul Alfiyyah](https://www.kaggle.com/datasets/nurulalfiyyah/rupiah-banknotes)
+Sumber Tambahan:[Indonesian Banknotes - Brotoa](https://www.kaggle.com/datasets/brotoa/indonesian-banknotes-for-machine-learning)
+
+Catatan Penggunaan:
+Karena batasan ukuran file di GitHub (Large Files), dataset fisik tidak diunggah langsung ke repository ini. Pengguna dapat mengunduh dari sumber asli di atas. 
+
+Instruksi Setup Dataset:
+1. Buat direktori bernama `dataset/` di root proyek.
+2. Unduh dan ekstrak kedua dataset di atas.
+3. Masukkan gambar ke dalam sub-folder sesuai label nominalnya (misal: `1000`, `2000`, dst).
+4. Pastikan hanya menggunakan emisi uang yang sesuai dengan ruang lingkup proyek (Emisi 2016 & 2022).
+
 ## 🚀 Fitur Utama
 * **Pemindaian Otomatis:** Kamera melakukan *scanning* aktif secara otomatis tanpa perlu menekan tombol[cite: 297].
 * **Output Suara Bahasa Indonesia:** Menggunakan *Web Speech API* untuk membacakan nominal uang secara jernih[cite: 298].
